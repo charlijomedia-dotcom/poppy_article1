@@ -1,6 +1,9 @@
 {
-  "source": "Yahoo Finance via the yfinance Python package",
-  "downloaded_utc": "2026-10-20T14:55:38.015374+00:00",
+  "sources": {
+    "equity_bond_metal": "Yahoo Finance via the yfinance Python package",
+    "risk_free": "FRED series DGS3MO (3-Month Treasury Constant Maturity Rate), downloaded as CSV"
+  },
+  "downloaded_utc": "2026-10-20T16:33:54.074774+00:00",
   "requested_window": {
     "start": "2006-01-01",
     "end_exclusive": "2026-10-01"
@@ -13,29 +16,61 @@
   "versions": {
     "python": "3.13.16",
     "pandas": "3.0.5",
-    "yfinance": "1.7.0"
+    "yfinance": "1.7.0",
+    "pandas_market_calendars": "5.5.0"
   },
   "files": {
     "SPY_yahoo_raw.csv": {
-      "ticker": "SPY",
+      "role": "analysis",
+      "key": "SPY",
+      "source": "Yahoo Finance",
       "rows": 5218,
-      "sha256": "654071724e311d606ce7e50de8b9274240641cb5f7d41f1cfb48ee744aed1c3d"
+      "sha256": "17c31d4085d252f97afec4d35e32a1ad673f4d9eebcd4c67c76fd04c4fb479e5"
     },
     "AGG_yahoo_raw.csv": {
-      "ticker": "AGG",
+      "role": "analysis",
+      "key": "AGG",
+      "source": "Yahoo Finance",
       "rows": 5218,
-      "sha256": "c64c67a367608dae9df5249516470438b508d03fc9ad6927bb4798567246f5a1"
+      "sha256": "2cb897add9c93fccbd131557ecf782bae8ce15805605f6c3c62153c7d9df68fe"
     },
     "GLD_yahoo_raw.csv": {
-      "ticker": "GLD",
+      "role": "analysis",
+      "key": "GLD",
+      "source": "Yahoo Finance",
       "rows": 5218,
       "sha256": "ec5677899d8f94a97a55ae3d3d1d16a250a6e33b779a67a7dce4a30599a3eee8"
     },
     "SLV_yahoo_raw.csv": {
-      "ticker": "SLV",
+      "role": "analysis",
+      "key": "SLV",
+      "source": "Yahoo Finance",
       "rows": 5138,
       "sha256": "8c1400b71609ed08eb7b9453068f6218f2e61a55b2c2329f267ac1e943f2ce43"
+    },
+    "SIVR_yahoo_raw.csv": {
+      "role": "cross_check",
+      "key": "SIVR",
+      "verifies": "SLV",
+      "source": "Yahoo Finance",
+      "rows": 4323,
+      "sha256": "cb9d102a8058a4c8d62d4d585014b71d8aae4fbdda8cb31383f15c00dc7f7038"
+    },
+    "IAU_yahoo_raw.csv": {
+      "role": "cross_check",
+      "key": "IAU",
+      "verifies": "GLD",
+      "source": "Yahoo Finance",
+      "rows": 5218,
+      "sha256": "bea59541c828765233e36e2b941d2c4a0e93282bbc4959608e5ea73b0a6f83e6"
+    },
+    "DGS3MO_fred_raw.csv": {
+      "role": "risk_free",
+      "key": "DGS3MO",
+      "source": "Federal Reserve Economic Data (FRED), St. Louis Fed",
+      "rows": 5413,
+      "sha256": "2ecb5ca14efc47778dfd1c23ec646df9b894810d99cbc0f4775c06847dc2c13c"
     }
   },
-  "licence_note": "Yahoo Finance terms of service contemplate personal, non-commercial use. Raw CSVs are archived here for reproducibility; see research_protocol.md unresolved decision U8. The checksums alone pin the inputs if the CSVs must be removed."
+  "licence_note": "Yahoo Finance terms of service restrict redistribution. See research_protocol.md decision D8 for the storage options; note that deleting these CSVs in a later commit does not remove them from the repository's published Git history. FRED data are US Government works and are not subject to copyright."
 }

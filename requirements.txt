@@ -3,6 +3,8 @@
 pandas==3.0.5
 numpy==2.5.3
 yfinance==1.7.0
+requests==2.34.2
+pandas_market_calendars==5.5.0   # official NYSE calendar; validation only
 pytest==9.1.1
 
 # Phase 2/3 (not yet exercised)
