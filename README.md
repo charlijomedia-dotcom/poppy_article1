@@ -14,22 +14,25 @@ fixed before any performance estimation. Read that first.
 
 | Phase | Content | State |
 |---|---|---|
-| 1 | Data acquisition, validation, frozen protocol | **Complete, awaiting review** |
-| 2 | Portfolio simulation, Expected Shortfall selection, performance metrics | Not started |
+| 1 | Data acquisition, validation, frozen protocol | Complete, reviewed, merged |
+| 2 | Portfolio simulation, Expected Shortfall selection, performance metrics | **Complete, awaiting review** |
 | 3 | Statistical inference, robustness, tables and figures | Not started |
 
-Phase 2 does not begin until Phase 1 has been independently reviewed and approved.
-No portfolio-performance results have been computed.
+Phase 3 does not begin until Phase 2 has been independently reviewed and approved.
+No bootstrap confidence intervals or robustness experiments have been computed.
 
 ## Layout
 
 ```
 research_protocol.md               frozen research design and implementation decisions
 download_data.py                   Phase 1: build, validate and freeze the dataset
-test_data.py                       structure, chronology and integrity tests
+test_data.py                       Phase 1: structure, chronology and integrity tests
+analysis.py                        Phase 2: simulation, ES selection, core metrics
+test_analysis.py                   Phase 2: mechanics, costs and look-ahead tests
 requirements.txt                   pinned dependencies
 data/raw/                          frozen raw downloads + SHA-256 manifest
 data/processed/                    price panel, daily returns, risk-free series
+data/results/                      performance metrics, daily returns, allocations
 data/data_coverage_report.md       generated coverage and validation report
 ```
 
@@ -56,6 +59,24 @@ Both modes validate rather than repair: no price observation is interpolated,
 forward filled or simulated anywhere in the pipeline. The script exits non-zero
 if any check fails. `test_data.py` reads the frozen artifacts, makes no network
 calls, and fails (rather than skipping) if a required file is absent.
+
+## Reproducing Phase 2
+
+```bash
+python3 analysis.py                  # reads the frozen Phase 1 outputs; no downloads
+python3 -m pytest test_analysis.py -v
+```
+
+`analysis.py` simulates the five approved strategies through one shared engine, so
+the decision/execution timing, weight drift and transaction-cost treatment are
+identical across strategies by construction. It writes
+`data/results/performance_metrics.csv`,
+`data/results/daily_portfolio_returns.csv` and
+`data/results/dynamic_allocation_history.csv`.
+
+Out-of-sample evaluation runs **2010-01-04 to 2026-09-30** (4,211 trading days,
+16.7 years, 201 monthly decisions), at the protocol's principal cost of 10 bp per
+dollar traded. The 25 and 50 bp robustness variants are Phase 3.
 
 ## Data
 
