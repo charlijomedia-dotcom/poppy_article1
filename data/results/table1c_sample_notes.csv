@@ -1,0 +1,7 @@
+item,value
+Data sample (daily returns),2007-01-03 to 2026-09-30
+Observations per instrument,4967
+Out-of-sample evaluation window,2010-01-04 to 2026-09-30
+Evaluation observations,4211
+Risk-free series,FRED DGS3MO (3-month Treasury constant maturity)
+Risk-free annualised yield range (%),0.00 to 5.63

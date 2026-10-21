@@ -220,9 +220,17 @@ def simulate(returns, rf_prev, schedule, target_for, cost_per_dollar=COST_PER_DO
 
 
 def max_drawdown(net_returns):
-    """Largest peak-to-trough decline of the cumulative net return series."""
-    cumulative = (1.0 + net_returns).cumprod()
-    return float((cumulative / cumulative.cummax() - 1.0).min())
+    """Largest peak-to-trough decline of the net wealth path, starting from 1.
+
+    The path begins at 1 before any return accrues, so a decline on the first
+    day is measured from that initial wealth rather than from the first day's
+    closing wealth. Omitting the leading 1 understates any drawdown whose peak
+    is the starting point.
+    """
+    wealth = np.concatenate(
+        [[1.0], (1.0 + np.asarray(net_returns, dtype=float)).cumprod()]
+    )
+    return float((wealth / np.maximum.accumulate(wealth) - 1.0).min())
 
 
 def performance_metrics(history, rf_prev):
@@ -231,7 +239,9 @@ def performance_metrics(history, rf_prev):
     n = len(net)
     years = n / TRADING_DAYS_PER_YEAR
     excess = net - rf_prev.reindex(net.index)
+    gross = history["gross_return"]
     cumulative = float((1.0 + net).prod())
+    cumulative_gross = float((1.0 + gross).prod())
     excess_sd = float(excess.std(ddof=1))
     # One-way turnover (D6); costs are charged on the full traded fraction.
     one_way = history["traded_fraction"].sum() / 2.0
@@ -247,7 +257,21 @@ def performance_metrics(history, rf_prev):
         "expected_shortfall_95": expected_shortfall(net),
         "max_drawdown": max_drawdown(net),
         "annualized_turnover_one_way": float(one_way / years),
-        "total_cost_paid": float(history["cost"].sum()),
+        # Transaction-cost reporting. `gross_return` is the return before costs
+        # on the same weight path, and weights never depend on costs, so it is
+        # exactly this strategy's zero-cost return series. The drag is therefore
+        # an exact difference, not an approximation.
+        "annualized_gross_return": float(gross.mean() * TRADING_DAYS_PER_YEAR),
+        "annualized_cost_drag": float(
+            (gross.mean() - net.mean()) * TRADING_DAYS_PER_YEAR
+        ),
+        "cagr_cost_drag": (
+            cumulative_gross ** (1.0 / years) - cumulative ** (1.0 / years)
+        ),
+        # Sum of the daily proportional charges, each a fraction of that day's
+        # portfolio value. A dimensionless sum of same-day fractions: NOT a
+        # currency amount and NOT a cumulative fraction of terminal wealth.
+        "sum_daily_proportional_cost": float(history["cost"].sum()),
         "cumulative_net_return": cumulative - 1.0,
         "n_days": n,
         "years": years,

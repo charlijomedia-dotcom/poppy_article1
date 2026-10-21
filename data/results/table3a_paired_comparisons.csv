@@ -1,0 +1,13 @@
+Cost (bp),Comparison,Ann. difference (pp),95% bootstrap CI (pp),Info. ratio,p-value,Status
+10,Dynamic ES - Traditional 60/40,-0.050,"[-0.461, 0.364]",-0.053,0.8126,tested
+10,Dynamic ES - Static gold,0.000,--,--,n/a,identical_series
+10,Dynamic ES - Static silver,-0.149,"[-0.702, 0.380]",-0.132,0.5849,tested
+10,Dynamic ES - Vol-managed 60/40,1.500,"[0.287, 2.941]",0.615,0.0262,tested
+25,Dynamic ES - Traditional 60/40,-0.053,"[-0.464, 0.362]",-0.056,0.8028,tested
+25,Dynamic ES - Static gold,0.000,--,--,n/a,identical_series
+25,Dynamic ES - Static silver,-0.147,"[-0.698, 0.383]",-0.130,0.5919,tested
+25,Dynamic ES - Vol-managed 60/40,1.551,"[0.334, 3.004]",0.635,0.0240,tested
+50,Dynamic ES - Traditional 60/40,-0.057,"[-0.468, 0.357]",-0.060,0.7876,tested
+50,Dynamic ES - Static gold,0.000,--,--,n/a,identical_series
+50,Dynamic ES - Static silver,-0.142,"[-0.693, 0.387]",-0.126,0.6026,tested
+50,Dynamic ES - Vol-managed 60/40,1.636,"[0.400, 3.108]",0.669,0.0199,tested
