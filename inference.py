@@ -49,6 +49,14 @@ BENCHMARKS = ["traditional_60_40", "static_gold", "static_silver",
               "volatility_managed_60_40"]
 DYNAMIC = "dynamic_es"
 
+# The approved primary research hypothesis is directional: the dynamic strategy
+# is tested for *superiority* over the traditional 60/40 portfolio at the
+# principal cost assumption. Every other comparison is supplementary and stays
+# two-sided. See research_protocol.md section 8.
+PRIMARY_BENCHMARK = "traditional_60_40"
+PRIMARY_COST_BPS = PRINCIPAL_COST_BPS
+PRIMARY_ALTERNATIVE = "greater"
+
 STRATEGY_LABELS = {
     "traditional_60_40": "Traditional 60/40",
     "static_gold": "Static gold",
@@ -131,28 +139,41 @@ def bootstrap_index_block(n, size, restart_probability, rng):
 
 
 def paired_comparison(dynamic_net, benchmark_net, boot_means=None,
-                      confidence=CONFIDENCE):
-    """Test the paired daily net-return difference against zero.
+                      confidence=CONFIDENCE, alternative="two-sided"):
+    """Test the paired daily net-return difference, d_t = dynamic minus benchmark.
 
-    Hypotheses, two-sided:
-        H0: E[d_t] = 0      the dynamic strategy and the benchmark have equal
-                            expected daily net returns
+    Pairing by date removes the common market component, so the test speaks only
+    to the difference the allocation rule makes.
+
+    `alternative="greater"` is the **primary**, directional test of superiority:
+
+        H0: E[d_t] <= 0     the dynamic strategy does not beat the benchmark
+        H1: E[d_t] >  0     the dynamic strategy beats the benchmark
+
+    `alternative="two-sided"` is the **supplementary** test of equality:
+
+        H0: E[d_t] = 0
         H1: E[d_t] != 0
-    where d_t = net return of the dynamic strategy minus that of the benchmark
-    on the same day. Pairing by date removes the common market component, so the
-    test speaks only to the difference the allocation rule makes.
 
-    Inference is by the stationary block bootstrap: the confidence interval is
-    the percentile interval of the bootstrap means, and the p-value is the share
-    of replications whose mean, recentred on the null, is at least as extreme as
-    the observed mean. The (1 + count) / (1 + B) convention keeps the p-value
-    strictly positive and makes its resolution explicit.
+    Inference is by the stationary block bootstrap in both cases, on the same
+    replications. The bootstrap distribution is recentred on the null before
+    counting: the one-sided p-value is the share of recentred replications at
+    least as large as the observed mean, and the two-sided p-value the share at
+    least as extreme in absolute value. The (1 + count) / (1 + B) convention
+    keeps the p-value strictly positive and makes its resolution explicit.
+
+    The reported interval matches the hypothesis: a two-sided percentile
+    interval for the two-sided test, and a one-sided lower confidence bound
+    (upper limit infinite) for the directional test.
 
     If the two series are *exactly* identical the difference is identically
     zero: there is no sampling variation, the bootstrap is degenerate, and a
     numerical p-value would be meaningless. Such a comparison is returned with
-    `status = "identical_series"` and no p-value.
+    `status = "identical_series"` and no p-value, whichever alternative is asked
+    for.
     """
+    if alternative not in ("two-sided", "greater"):
+        raise ValueError(f"unsupported alternative: {alternative!r}")
     a = np.asarray(dynamic_net, dtype=float)
     b = np.asarray(benchmark_net, dtype=float)
     diff = a - b
@@ -162,6 +183,7 @@ def paired_comparison(dynamic_net, benchmark_net, boot_means=None,
     if np.array_equal(a, b):
         return {
             "status": "identical_series",
+            "alternative": alternative,
             "n_days": n,
             "mean_daily_difference": 0.0,
             "annualized_difference": 0.0,
@@ -180,20 +202,29 @@ def paired_comparison(dynamic_net, benchmark_net, boot_means=None,
     boot_means = np.asarray(boot_means, dtype=float)
 
     alpha = 1.0 - confidence
-    low, high = np.percentile(boot_means, [100 * alpha / 2, 100 * (1 - alpha / 2)])
-
     # Recentre the bootstrap distribution on the null before counting.
-    extreme = np.abs(boot_means - observed) >= abs(observed)
+    centred = boot_means - observed
+    if alternative == "greater":
+        # One-sided: only evidence in the hypothesised direction counts, and the
+        # interval becomes a lower confidence bound.
+        extreme = centred >= observed
+        low = float(np.percentile(boot_means, 100 * alpha)) * scale
+        high = np.inf
+    else:
+        extreme = np.abs(centred) >= abs(observed)
+        bounds = np.percentile(boot_means, [100 * alpha / 2, 100 * (1 - alpha / 2)])
+        low, high = float(bounds[0]) * scale, float(bounds[1]) * scale
     p_value = (1 + int(extreme.sum())) / (1 + len(boot_means))
 
     sd = float(diff.std(ddof=1))
     return {
         "status": "tested",
+        "alternative": alternative,
         "n_days": n,
         "mean_daily_difference": observed,
         "annualized_difference": observed * scale,
-        "ci_low": float(low) * scale,
-        "ci_high": float(high) * scale,
+        "ci_low": low,
+        "ci_high": high,
         "p_value": p_value,
         "p_value_resolution": 1.0 / (1 + len(boot_means)),
         "information_ratio": (
@@ -354,6 +385,10 @@ def performance_table(metrics):
 
 def inference_table(inference, performance_by_cost):
     """Table 3: paired comparisons (Panel A) and cost robustness (Panel B)."""
+    hypothesis = {
+        "greater": "one-sided (H1: > 0)",
+        "two-sided": "two-sided (H1: != 0)",
+    }
     rows = []
     for record in inference:
         if record["status"] == "identical_series":
@@ -362,12 +397,19 @@ def inference_table(inference, performance_by_cost):
             effect = "0.000"
             ir = "--"
         else:
-            ci = f"[{record['ci_low'] * 100:.3f}, {record['ci_high'] * 100:.3f}]"
+            if np.isinf(record["ci_high"]):
+                # Directional test: a one-sided lower confidence bound.
+                ci = f"[{record['ci_low'] * 100:.3f}, inf)"
+            else:
+                ci = (f"[{record['ci_low'] * 100:.3f}, "
+                      f"{record['ci_high'] * 100:.3f}]")
             p = (f"{record['p_value']:.4f}" if record["p_value"] > record["p_value_resolution"]
                  else f"<{record['p_value_resolution']:.4f}")
             effect = f"{record['annualized_difference'] * 100:.3f}"
             ir = f"{record['information_ratio']:.3f}"
         rows.append({
+            "Test": record["test_role"].capitalize(),
+            "Hypothesis": hypothesis[record["alternative"]],
             "Cost (bp)": record["cost_bps"],
             "Comparison": f"Dynamic ES - {STRATEGY_LABELS[record['benchmark']]}",
             "Ann. difference (pp)": effect,
@@ -574,6 +616,7 @@ def main():
 
     # --- Task 2: paired inference at every cost level ---
     inference = []
+    primary = None
     for cost in COST_LEVELS_BPS:
         daily = daily_by_cost[cost]
         testable = {
@@ -582,14 +625,33 @@ def main():
             if not np.array_equal(daily[DYNAMIC].to_numpy(), daily[name].to_numpy())
         }
         boot = stationary_bootstrap_means(testable) if testable else {}
+
+        # Primary test: the approved directional hypothesis, run on exactly the
+        # same replications as the supplementary tests at this cost level.
+        if cost == PRIMARY_COST_BPS:
+            primary = paired_comparison(
+                daily[DYNAMIC], daily[PRIMARY_BENCHMARK],
+                boot_means=boot.get(PRIMARY_BENCHMARK),
+                alternative=PRIMARY_ALTERNATIVE,
+            )
+            primary["cost_bps"] = cost
+            primary["benchmark"] = PRIMARY_BENCHMARK
+            primary["test_role"] = "primary"
+            inference.append(primary)
+
         for name in BENCHMARKS:
             record = paired_comparison(daily[DYNAMIC], daily[name],
                                        boot_means=boot.get(name))
             record["cost_bps"] = cost
             record["benchmark"] = name
+            record["test_role"] = "supplementary"
             inference.append(record)
         print(f"  bootstrap {cost:>2} bp : {len(testable)} testable comparisons, "
               f"{len(BENCHMARKS) - len(testable)} identical")
+    if primary is None:
+        raise AssertionError("the primary directional test was not run")
+    print(f"  primary test     : {DYNAMIC} vs {PRIMARY_BENCHMARK} at "
+          f"{PRIMARY_COST_BPS} bp, one-sided (H1: difference > 0)")
 
     # Supplementary multiplicity note. Three testable comparisons are made per
     # cost level, so a nominal 5% threshold overstates the evidence from the
@@ -598,17 +660,21 @@ def main():
     # adjustment is recorded alongside them as context, not as a substitute.
     n_testable = sum(1 for r in inference
                      if r["status"] == "tested"
+                     and r["test_role"] == "supplementary"
                      and r["cost_bps"] == PRINCIPAL_COST_BPS)
     for record in inference:
-        record["n_comparisons_at_cost_level"] = n_testable
+        supplementary = record["test_role"] == "supplementary"
+        record["n_comparisons_at_cost_level"] = n_testable if supplementary else 1
+        # The primary test is a single prespecified hypothesis, so it carries no
+        # multiplicity burden; the adjustment applies to the supplementary family.
         record["bonferroni_p_value"] = (
             min(1.0, record["p_value"] * n_testable)
-            if record["status"] == "tested" else np.nan
+            if record["status"] == "tested" and supplementary else np.nan
         )
 
     inference_frame = pd.DataFrame(inference)[
-        ["cost_bps", "benchmark", "status", "n_days", "n_days_differing",
-         "max_abs_daily_difference", "mean_daily_difference",
+        ["test_role", "alternative", "cost_bps", "benchmark", "status", "n_days",
+         "n_days_differing", "max_abs_daily_difference", "mean_daily_difference",
          "annualized_difference", "ci_low", "ci_high", "information_ratio",
          "p_value", "p_value_resolution", "n_comparisons_at_cost_level",
          "bonferroni_p_value"]
@@ -653,19 +719,27 @@ def main():
                      "selected gold at all 201 decisions.")
     write_latex(inference_panel_a, RESULTS_DIR / "table3a_paired_comparisons.tex",
                 caption="Paired daily net-return differences, dynamic strategy "
-                        "minus each benchmark.",
+                        "minus each benchmark. Primary and supplementary tests.",
                 label="tab:inference", index=False,
-                note="H0: equal expected daily net returns; two-sided. "
-                     "Inference by stationary block bootstrap, expected block "
-                     "length 21 trading days, 10{,}000 replications, seed "
-                     "20261025. Differences are annualised and expressed in "
+                note="The PRIMARY test is the prespecified directional "
+                     "hypothesis for the dynamic strategy against traditional "
+                     "60/40 at 10 basis points: H0 that the expected daily net "
+                     "return difference is at most zero, against H1 that it is "
+                     r"positive, reported with a one-sided 95\% lower "
+                     "confidence bound. All other rows are SUPPLEMENTARY "
+                     "two-sided tests of equality with two-sided percentile "
+                     "intervals. Inference is by stationary block bootstrap "
+                     "throughout, expected block length 21 trading days, "
+                     "10{,}000 replications, seed 20261025, on identical "
+                     "replications. Differences are annualised and expressed in "
                      "percentage points. The dynamic strategy and static gold "
                      "are the same series, so that comparison has no sampling "
-                     "variation and no p-value is reported. Three testable "
-                     "comparisons are made per cost level; a Bonferroni-adjusted "
-                     "p-value is reported in bootstrap\_inference.csv as "
-                     "context. The correction was not prespecified, so the "
-                     "p-values above are the prespecified test.")
+                     "variation and no p-value is reported. The three "
+                     "supplementary comparisons per cost level carry a "
+                     "Bonferroni-adjusted p-value in "
+                     r"bootstrap\_inference.csv as context; that correction was "
+                     "not prespecified and does not apply to the single primary "
+                     "test.")
     write_latex(inference_panel_b, RESULTS_DIR / "table3b_cost_robustness.tex",
                 caption="Transaction-cost robustness: annualised mean net return "
                         "and Sharpe ratio at 10, 25 and 50 basis points.",
@@ -698,17 +772,31 @@ def main():
     print(f"Task 5/2 - performance at {PRINCIPAL_COST_BPS} bp")
     print(performance.to_string(float_format=lambda v: f"{v:10.4f}"))
     print()
-    print("Task 2 - paired comparisons (annualised pp, two-sided)")
+    print("PRIMARY TEST - prespecified directional hypothesis")
+    print(f"  H0: E[dynamic - {PRIMARY_BENCHMARK}] <= 0   vs   H1: > 0   "
+          f"at {PRIMARY_COST_BPS} bp")
+    print(f"  annualised difference : {primary['annualized_difference'] * 100:+.3f} pp")
+    print(f"  95% lower bound       : {primary['ci_low'] * 100:+.3f} pp "
+          f"(one-sided, upper bound infinite)")
+    print(f"  one-sided p-value     : {primary['p_value']:.4f}")
+    verdict = ("REJECT H0: evidence of superiority"
+               if primary["p_value"] < 0.05
+               else "FAIL TO REJECT H0: no evidence of superiority")
+    print(f"  conclusion            : {verdict}")
+    print()
+    print("All comparisons (annualised pp); primary row first")
     print(inference_panel_a.to_string(index=False))
     print()
     print(f"  Multiplicity note: {n_testable} testable comparisons per cost level. "
           "Bonferroni-adjusted p-values (supplementary, not prespecified):")
     for record in inference:
-        if record["status"] == "tested":
+        if record["status"] == "tested" and record["test_role"] == "supplementary":
             print(f"    {record['cost_bps']:>2} bp  "
                   f"{STRATEGY_LABELS[record['benchmark']]:<22} "
                   f"nominal p={record['p_value']:.4f}  "
                   f"Bonferroni p={record['bonferroni_p_value']:.4f}")
+    print("    The primary directional test is a single prespecified "
+          "hypothesis and carries no multiplicity burden.")
     print()
     print("Task 3 - cost robustness (annualised mean net return, %)")
     print(inference_panel_b.to_string(float_format=lambda v: f"{v:9.4f}"))

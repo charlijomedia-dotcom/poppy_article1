@@ -7,8 +7,17 @@
 revision corrects a factual error about an SLV corporate action (Section 9) and
 settles the implementation decisions that were previously open (Section 10).
 No performance results had been computed at the time of either version.
-**Status:** Phase 1 (data acquisition and validation) implemented. Phases 2 and
-3 not started.
+**Revised:** 22 October 2026, following independent review of Phase 3. The
+revision records the approved **directional** form of the primary hypothesis in
+Section 8, which the Phase 3 code had implemented only as a two-sided test of
+equality. This was made after results were known, so it is recorded here
+explicitly. It changes no data, no selection rule, no weight, no cost
+assumption, no estimation window and no empirical quantity; it changes only
+which hypothesis is tested against the same estimated difference. It cannot
+make the conclusion more favourable: the estimated difference against the
+traditional 60/40 portfolio is **negative**, so a one-sided superiority test can
+only fail to reject, and it does (p = 0.5839).
+**Status:** Phases 1, 2 and 3 implemented. Manuscript not written.
 
 This document fixes the research design *before* out-of-sample results are
 computed. It is the reference against which later code is checked. Changes to
@@ -174,7 +183,31 @@ is carried forward; every occurrence is flagged in
 Paired out-of-sample net return differences (dynamic strategy minus each
 benchmark), evaluated with a **stationary block bootstrap**, expected block
 length **21 trading days** (one month), **10,000 replications**, random seed
-fixed at **20261025** and set explicitly in code.
+fixed at **20261025** and set explicitly in code. All comparisons are drawn on
+identical replications.
+
+*Primary hypothesis (directional).* The approved primary hypothesis is a test
+of **superiority** of the dynamic strategy over the traditional 60/40 portfolio,
+on the primary outcome (net return) at the principal cost assumption of 10 basis
+points:
+
+> H0: E[r_dynamic,t - r_60/40,t] <= 0
+> H1: E[r_dynamic,t - r_60/40,t] >  0
+
+It is one-sided and is reported with a one-sided 95% **lower confidence bound**
+(the upper limit is unbounded). This is a single prespecified hypothesis and
+carries no multiplicity burden.
+
+*Supplementary comparisons.* Every other comparison — the remaining benchmarks,
+and all comparisons at the 25 and 50 basis point robustness levels — is a
+**two-sided** test of equality (H0: difference = 0) reported with a two-sided
+percentile interval. These form a family of three testable comparisons per cost
+level; a Bonferroni-adjusted p-value is reported alongside them as context only,
+and was not prespecified.
+
+Where two strategies produce *exactly* identical return series, the difference
+is identically zero, the bootstrap is degenerate and no p-value is reported,
+under either alternative.
 
 ---
 

@@ -90,18 +90,26 @@ python3 -m pytest test_inference.py -v
 
 Runs the prespecified stationary block bootstrap (expected block length 21
 trading days, 10,000 replications, seed 20261025) on paired daily net-return
-differences, repeats the simulation at 10, 25 and 50 bp, and writes three
+differences — the primary directional test plus the supplementary two-sided
+ones — repeats the simulation at 10, 25 and 50 bp, and writes three
 publication tables (CSV and LaTeX) plus two figures (PDF and PNG). No downloads;
 everything derives from the frozen Phase 1 data.
 
 ### Headline result
 
 The Expected Shortfall rule selected gold at **all 201** monthly decisions, so
-the dynamic strategy is numerically identical to static gold. Against the
-traditional 60/40 benchmark the dynamic strategy earns **-0.05 percentage points
-per year** net, with a 95% bootstrap confidence interval of [-0.46, +0.36] —
-**no evidence that dynamic safe-haven allocation improves net returns**. This is
-an empirical finding; no parameter was changed in response to it.
+the dynamic strategy is numerically identical to static gold.
+
+The **primary** test is the prespecified directional hypothesis — superiority of
+the dynamic strategy over traditional 60/40 on net return at 10 bp
+(H0: difference <= 0 against H1: difference > 0). The estimated difference is
+**-0.050 percentage points per year**, one-sided 95% lower bound **-0.392 pp**,
+**one-sided p = 0.5839**: *fail to reject H0*, so **no evidence that dynamic
+safe-haven allocation improves net returns**. The supplementary two-sided test
+of equality gives the same estimate with a 95% interval of [-0.461, +0.364],
+p = 0.8126.
+
+This is an empirical finding; no parameter was changed in response to it.
 
 ## Data
 

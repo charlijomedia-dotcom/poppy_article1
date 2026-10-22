@@ -139,6 +139,118 @@ def test_identical_series_yield_no_p_value():
     assert result["max_abs_daily_difference"] == 0.0
 
 
+# --- Primary directional (one-sided) test ------------------------------------
+
+def test_one_sided_p_value_is_hand_checkable():
+    """Arithmetic worked out by hand on a crafted bootstrap distribution.
+
+    The difference series is the constant 0.001, so the observed mean d is
+    0.001. The five bootstrap means are recentred by subtracting d.
+
+    One-sided (H1: > 0) counts recentred >= d, i.e. bootstrap mean >= 2d =
+    0.002: that is 0.0025 and 0.0035, two of five, so
+        p = (1 + 2) / (1 + 5) = 0.5.
+    Two-sided counts |recentred| >= d, i.e. bootstrap mean <= 0 or >= 0.002:
+    that is -0.0005, 0.0025 and 0.0035, three of five, so
+        p = (1 + 3) / (1 + 5) = 2/3.
+
+    Every value sits at least 0.0005 away from a decision boundary, so the
+    counts are exact and cannot be flipped by floating-point representation.
+    (The obvious choice of 0.002 as a bootstrap value would sit exactly on the
+    one-sided threshold, where the mean of ten copies of 0.001 rounds to
+    0.0010000000000000002 and tips the comparison.)
+    """
+    benchmark = np.zeros(10)
+    dynamic = np.full(10, 0.001)
+    boot = np.array([-0.0005, 0.0005, 0.0015, 0.0025, 0.0035])
+
+    greater = inf.paired_comparison(dynamic, benchmark, boot_means=boot,
+                                    alternative="greater")
+    assert greater["alternative"] == "greater"
+    assert greater["mean_daily_difference"] == pytest.approx(0.001)
+    assert greater["p_value"] == pytest.approx(3 / 6)
+
+    two_sided = inf.paired_comparison(dynamic, benchmark, boot_means=boot)
+    assert two_sided["alternative"] == "two-sided"
+    assert two_sided["p_value"] == pytest.approx(4 / 6)
+
+
+def test_one_sided_interval_is_a_lower_bound():
+    """A directional test reports a lower bound, not a two-sided interval."""
+    benchmark = np.zeros(10)
+    dynamic = np.full(10, 0.001)
+    boot = np.array([-0.0005, 0.0005, 0.0015, 0.0025, 0.0035])
+    greater = inf.paired_comparison(dynamic, benchmark, boot_means=boot,
+                                    alternative="greater")
+    assert np.isinf(greater["ci_high"])
+    assert np.isfinite(greater["ci_low"])
+
+    two_sided = inf.paired_comparison(dynamic, benchmark, boot_means=boot)
+    assert np.isfinite(two_sided["ci_high"])
+
+
+def test_unsupported_alternative_is_rejected():
+    with pytest.raises(ValueError):
+        inf.paired_comparison(np.zeros(5), np.ones(5), boot_means=np.zeros(4),
+                              alternative="less")
+
+
+def test_one_sided_test_detects_a_seeded_positive_edge():
+    """A genuine positive edge: one-sided evidence is stronger than two-sided."""
+    rng = np.random.default_rng(inf.SEED)
+    # The two legs must be independent, so the *difference* has real variance.
+    # Shifting one series by a constant would make the difference constant, and
+    # a zero-variance difference pins both p-values to the resolution floor.
+    benchmark = rng.normal(0, 0.005, 1200)
+    # Calibrated so neither p-value hits the floor: the realised sample mean of
+    # this seeded draw is about 0.00052 a day, t of roughly 2.6.
+    dynamic = rng.normal(0, 0.005, 1200) + 0.0002
+    greater = inf.paired_comparison(dynamic, benchmark, alternative="greater")
+    two_sided = inf.paired_comparison(dynamic, benchmark)
+    assert greater["p_value"] > greater["p_value_resolution"], "not at the floor"
+    assert greater["p_value"] < two_sided["p_value"]
+    assert greater["p_value"] < 0.05
+    assert greater["ci_low"] > 0
+
+
+def test_one_sided_test_does_not_reward_a_negative_effect():
+    """With the point estimate below zero, superiority cannot be supported."""
+    rng = np.random.default_rng(inf.SEED)
+    benchmark = rng.normal(0, 0.005, 1200)
+    worse = rng.normal(0, 0.005, 1200) - 0.0005
+    greater = inf.paired_comparison(worse, benchmark, alternative="greater")
+    assert greater["annualized_difference"] < 0
+    assert greater["p_value"] > 0.5
+    assert greater["ci_low"] < 0
+
+
+def test_one_sided_is_about_half_the_two_sided_for_a_symmetric_draw():
+    rng = np.random.default_rng(99)
+    # Independent legs again, so the difference is not degenerate and the two
+    # p-values are genuinely comparable rather than both pinned to the floor.
+    benchmark = rng.normal(0, 0.01, 2000)
+    dynamic = rng.normal(0, 0.01, 2000) + 0.0002
+    boot = inf.stationary_bootstrap_means(
+        {"d": (dynamic - benchmark)}, n_boot=4000, seed=inf.SEED
+    )["d"]
+    greater = inf.paired_comparison(dynamic, benchmark, boot_means=boot,
+                                    alternative="greater")
+    two_sided = inf.paired_comparison(dynamic, benchmark, boot_means=boot)
+    assert greater["p_value"] > greater["p_value_resolution"]
+    assert two_sided["p_value"] > two_sided["p_value_resolution"]
+    assert greater["p_value"] == pytest.approx(two_sided["p_value"] / 2, abs=0.05)
+
+
+def test_identical_series_give_no_p_value_under_the_directional_test():
+    """The dynamic/static-gold treatment is preserved for the primary test too."""
+    rng = np.random.default_rng(12)
+    series = rng.normal(0, 0.01, 400)
+    result = inf.paired_comparison(series, series.copy(), alternative="greater")
+    assert result["status"] == "identical_series"
+    assert np.isnan(result["p_value"])
+    assert result["alternative"] == "greater"
+
+
 def test_a_real_difference_is_detected():
     rng = np.random.default_rng(8)
     base = rng.normal(0, 0.005, 1200)
@@ -274,7 +386,8 @@ def test_expected_output_exists(name):
 
 def test_inference_csv_records_every_comparison_at_every_cost_level():
     frame = pd.read_csv(RESULTS_DIR / "bootstrap_inference.csv")
-    assert len(frame) == len(inf.COST_LEVELS_BPS) * len(inf.BENCHMARKS)
+    # Every benchmark at every cost level, plus the one primary directional row.
+    assert len(frame) == len(inf.COST_LEVELS_BPS) * len(inf.BENCHMARKS) + 1
     assert set(frame["cost_bps"]) == set(inf.COST_LEVELS_BPS)
     identical = frame[frame["status"] == "identical_series"]
     assert len(identical) == len(inf.COST_LEVELS_BPS)
@@ -300,6 +413,53 @@ def test_published_table_shows_no_p_value_for_the_identical_comparison():
     assert default_read.loc[
         default_read["Status"] == "identical_series", "p-value"
     ].isna().all()
+
+
+def test_exported_inference_marks_exactly_one_primary_test():
+    frame = pd.read_csv(RESULTS_DIR / "bootstrap_inference.csv")
+    primary = frame[frame["test_role"] == "primary"]
+    assert len(primary) == 1
+    row = primary.iloc[0]
+    assert row["benchmark"] == inf.PRIMARY_BENCHMARK
+    assert row["cost_bps"] == inf.PRIMARY_COST_BPS
+    assert row["alternative"] == "greater"
+    assert row["status"] == "tested"
+    assert np.isinf(row["ci_high"])
+    # Supplementary rows stay two-sided and keep their multiplicity adjustment.
+    supplementary = frame[frame["test_role"] == "supplementary"]
+    assert (supplementary["alternative"] == "two-sided").all()
+    assert len(supplementary) == len(inf.COST_LEVELS_BPS) * len(inf.BENCHMARKS)
+    assert np.isnan(row["bonferroni_p_value"]), (
+        "a single prespecified test carries no multiplicity burden"
+    )
+
+
+def test_published_table_distinguishes_primary_from_supplementary():
+    table = pd.read_csv(RESULTS_DIR / "table3a_paired_comparisons.csv",
+                        keep_default_na=False)
+    assert "Test" in table.columns and "Hypothesis" in table.columns
+    primary = table[table["Test"] == "Primary"]
+    assert len(primary) == 1
+    assert primary.iloc[0]["Hypothesis"] == "one-sided (H1: > 0)"
+    assert primary.iloc[0]["Comparison"] == "Dynamic ES - Traditional 60/40"
+    assert "inf)" in primary.iloc[0]["95% bootstrap CI (pp)"]
+    assert (table[table["Test"] == "Supplementary"]["Hypothesis"]
+            == "two-sided (H1: != 0)").all()
+    latex = (RESULTS_DIR / "table3a_paired_comparisons.tex").read_text()
+    assert "PRIMARY" in latex and "SUPPLEMENTARY" in latex
+
+
+def test_primary_and_supplementary_agree_on_the_point_estimate():
+    """Same data and same resamples: only the hypothesis differs."""
+    frame = pd.read_csv(RESULTS_DIR / "bootstrap_inference.csv")
+    primary = frame[frame["test_role"] == "primary"].iloc[0]
+    twin = frame[(frame["test_role"] == "supplementary")
+                 & (frame["benchmark"] == inf.PRIMARY_BENCHMARK)
+                 & (frame["cost_bps"] == inf.PRIMARY_COST_BPS)].iloc[0]
+    assert primary["annualized_difference"] == pytest.approx(
+        twin["annualized_difference"]
+    )
+    assert primary["n_days"] == twin["n_days"]
 
 
 def test_performance_table_separates_arithmetic_mean_from_cagr():

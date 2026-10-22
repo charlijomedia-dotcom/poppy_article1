@@ -1,24 +1,25 @@
 \begin{table}[htbp]
 \centering
-\caption{Paired daily net-return differences, dynamic strategy minus each benchmark.}
+\caption{Paired daily net-return differences, dynamic strategy minus each benchmark. Primary and supplementary tests.}
 \label{tab:inference}
-\begin{tabular}{lrrrrrr}
+\begin{tabular}{lrrrrrrrr}
 \toprule
-Cost (bp) & Comparison & Ann. difference (pp) & 95\% bootstrap CI (pp) & Info. ratio & p-value & Status \\
+Test & Hypothesis & Cost (bp) & Comparison & Ann. difference (pp) & 95\% bootstrap CI (pp) & Info. ratio & p-value & Status \\
 \midrule
-10 & Dynamic ES - Traditional 60/40 & -0.050 & [-0.461, 0.364] & -0.053 & 0.8126 & tested \\
-10 & Dynamic ES - Static gold & 0.000 & -- & -- & n/a & identical\_series \\
-10 & Dynamic ES - Static silver & -0.149 & [-0.702, 0.380] & -0.132 & 0.5849 & tested \\
-10 & Dynamic ES - Vol-managed 60/40 & 1.500 & [0.287, 2.941] & 0.615 & 0.0262 & tested \\
-25 & Dynamic ES - Traditional 60/40 & -0.053 & [-0.464, 0.362] & -0.056 & 0.8028 & tested \\
-25 & Dynamic ES - Static gold & 0.000 & -- & -- & n/a & identical\_series \\
-25 & Dynamic ES - Static silver & -0.147 & [-0.698, 0.383] & -0.130 & 0.5919 & tested \\
-25 & Dynamic ES - Vol-managed 60/40 & 1.551 & [0.334, 3.004] & 0.635 & 0.0240 & tested \\
-50 & Dynamic ES - Traditional 60/40 & -0.057 & [-0.468, 0.357] & -0.060 & 0.7876 & tested \\
-50 & Dynamic ES - Static gold & 0.000 & -- & -- & n/a & identical\_series \\
-50 & Dynamic ES - Static silver & -0.142 & [-0.693, 0.387] & -0.126 & 0.6026 & tested \\
-50 & Dynamic ES - Vol-managed 60/40 & 1.636 & [0.400, 3.108] & 0.669 & 0.0199 & tested \\
+Primary & one-sided (H1: > 0) & 10 & Dynamic ES - Traditional 60/40 & -0.050 & [-0.392, inf) & -0.053 & 0.5839 & tested \\
+Supplementary & two-sided (H1: != 0) & 10 & Dynamic ES - Traditional 60/40 & -0.050 & [-0.461, 0.364] & -0.053 & 0.8126 & tested \\
+Supplementary & two-sided (H1: != 0) & 10 & Dynamic ES - Static gold & 0.000 & -- & -- & n/a & identical\_series \\
+Supplementary & two-sided (H1: != 0) & 10 & Dynamic ES - Static silver & -0.149 & [-0.702, 0.380] & -0.132 & 0.5849 & tested \\
+Supplementary & two-sided (H1: != 0) & 10 & Dynamic ES - Vol-managed 60/40 & 1.500 & [0.287, 2.941] & 0.615 & 0.0262 & tested \\
+Supplementary & two-sided (H1: != 0) & 25 & Dynamic ES - Traditional 60/40 & -0.053 & [-0.464, 0.362] & -0.056 & 0.8028 & tested \\
+Supplementary & two-sided (H1: != 0) & 25 & Dynamic ES - Static gold & 0.000 & -- & -- & n/a & identical\_series \\
+Supplementary & two-sided (H1: != 0) & 25 & Dynamic ES - Static silver & -0.147 & [-0.698, 0.383] & -0.130 & 0.5919 & tested \\
+Supplementary & two-sided (H1: != 0) & 25 & Dynamic ES - Vol-managed 60/40 & 1.551 & [0.334, 3.004] & 0.635 & 0.0240 & tested \\
+Supplementary & two-sided (H1: != 0) & 50 & Dynamic ES - Traditional 60/40 & -0.057 & [-0.468, 0.357] & -0.060 & 0.7876 & tested \\
+Supplementary & two-sided (H1: != 0) & 50 & Dynamic ES - Static gold & 0.000 & -- & -- & n/a & identical\_series \\
+Supplementary & two-sided (H1: != 0) & 50 & Dynamic ES - Static silver & -0.142 & [-0.693, 0.387] & -0.126 & 0.6026 & tested \\
+Supplementary & two-sided (H1: != 0) & 50 & Dynamic ES - Vol-managed 60/40 & 1.636 & [0.400, 3.108] & 0.669 & 0.0199 & tested \\
 \bottomrule
 \end{tabular}
-\begin{minipage}{\linewidth}\footnotesize H0: equal expected daily net returns; two-sided. Inference by stationary block bootstrap, expected block length 21 trading days, 10{,}000 replications, seed 20261025. Differences are annualised and expressed in percentage points. The dynamic strategy and static gold are the same series, so that comparison has no sampling variation and no p-value is reported. Three testable comparisons are made per cost level; a Bonferroni-adjusted p-value is reported in bootstrap\_inference.csv as context. The correction was not prespecified, so the p-values above are the prespecified test.\end{minipage}
+\begin{minipage}{\linewidth}\footnotesize The PRIMARY test is the prespecified directional hypothesis for the dynamic strategy against traditional 60/40 at 10 basis points: H0 that the expected daily net return difference is at most zero, against H1 that it is positive, reported with a one-sided 95\% lower confidence bound. All other rows are SUPPLEMENTARY two-sided tests of equality with two-sided percentile intervals. Inference is by stationary block bootstrap throughout, expected block length 21 trading days, 10{,}000 replications, seed 20261025, on identical replications. Differences are annualised and expressed in percentage points. The dynamic strategy and static gold are the same series, so that comparison has no sampling variation and no p-value is reported. The three supplementary comparisons per cost level carry a Bonferroni-adjusted p-value in bootstrap\_inference.csv as context; that correction was not prespecified and does not apply to the single primary test.\end{minipage}
 \end{table}
