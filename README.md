@@ -15,11 +15,11 @@ fixed before any performance estimation. Read that first.
 | Phase | Content | State |
 |---|---|---|
 | 1 | Data acquisition, validation, frozen protocol | Complete, reviewed, merged |
-| 2 | Portfolio simulation, Expected Shortfall selection, performance metrics | **Complete, awaiting review** |
-| 3 | Statistical inference, robustness, tables and figures | Not started |
+| 2 | Portfolio simulation, Expected Shortfall selection, performance metrics | Complete, reviewed, merged |
+| 3 | Statistical inference, robustness, tables and figures | **Complete, awaiting review** |
 
-Phase 3 does not begin until Phase 2 has been independently reviewed and approved.
-No bootstrap confidence intervals or robustness experiments have been computed.
+The manuscript has not been written. Phase 3 is submitted for independent review
+before manuscript preparation begins.
 
 ## Layout
 
@@ -29,10 +29,13 @@ download_data.py                   Phase 1: build, validate and freeze the datas
 test_data.py                       Phase 1: structure, chronology and integrity tests
 analysis.py                        Phase 2: simulation, ES selection, core metrics
 test_analysis.py                   Phase 2: mechanics, costs and look-ahead tests
+inference.py                       Phase 3: bootstrap, robustness, tables, figures
+test_inference.py                  Phase 3: bootstrap and output-integrity tests
 requirements.txt                   pinned dependencies
 data/raw/                          frozen raw downloads + SHA-256 manifest
 data/processed/                    price panel, daily returns, risk-free series
-data/results/                      performance metrics, daily returns, allocations
+data/results/                      metrics, daily returns, allocations,
+                                   tables (CSV + LaTeX) and figures (PDF + PNG)
 data/data_coverage_report.md       generated coverage and validation report
 ```
 
@@ -77,6 +80,36 @@ identical across strategies by construction. It writes
 Out-of-sample evaluation runs **2010-01-04 to 2026-09-30** (4,211 trading days,
 16.7 years, 201 monthly decisions), at the protocol's principal cost of 10 bp per
 dollar traded. The 25 and 50 bp robustness variants are Phase 3.
+
+## Reproducing Phase 3
+
+```bash
+python3 inference.py                  # bootstrap, robustness, tables, figures
+python3 -m pytest test_inference.py -v
+```
+
+Runs the prespecified stationary block bootstrap (expected block length 21
+trading days, 10,000 replications, seed 20261025) on paired daily net-return
+differences — the primary directional test plus the supplementary two-sided
+ones — repeats the simulation at 10, 25 and 50 bp, and writes three
+publication tables (CSV and LaTeX) plus two figures (PDF and PNG). No downloads;
+everything derives from the frozen Phase 1 data.
+
+### Headline result
+
+The Expected Shortfall rule selected gold at **all 201** monthly decisions, so
+the dynamic strategy is numerically identical to static gold.
+
+The **primary** test is the prespecified directional hypothesis — superiority of
+the dynamic strategy over traditional 60/40 on net return at 10 bp
+(H0: difference <= 0 against H1: difference > 0). The estimated difference is
+**-0.050 percentage points per year**, one-sided 95% lower bound **-0.392 pp**,
+**one-sided p = 0.5839**: *fail to reject H0*, so **no evidence that dynamic
+safe-haven allocation improves net returns**. The supplementary two-sided test
+of equality gives the same estimate with a 95% interval of [-0.461, +0.364],
+p = 0.8126.
+
+This is an empirical finding; no parameter was changed in response to it.
 
 ## Data
 

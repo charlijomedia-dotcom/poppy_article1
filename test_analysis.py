@@ -530,6 +530,17 @@ def test_max_drawdown_on_a_hand_computable_path():
     assert an.max_drawdown(returns) == pytest.approx(-0.5)
 
 
+def test_max_drawdown_includes_the_initial_wealth():
+    """Regression: a first-day decline is measured from the initial wealth of 1.
+
+    Wealth runs 1.00 -> 0.90 -> 0.945, so the peak is the starting point and the
+    drawdown is -10%. Computing the running maximum over the post-return path
+    alone would start at 0.90 and report no drawdown at all.
+    """
+    returns = pd.Series([-0.10, 0.05])
+    assert an.max_drawdown(returns) == pytest.approx(-0.10)
+
+
 def test_max_drawdown_is_zero_for_a_monotone_path():
     assert an.max_drawdown(pd.Series([0.01] * 10)) == pytest.approx(0.0)
 
